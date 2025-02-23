@@ -12,43 +12,58 @@ class AuthController extends Controller
 {
     public function register (Request $request)
     {
-        $request->validate([
-            'name' => 'required',
-            'email' => 'required|email|unique:users',
-            'password' => 'required|min:6',
-        ]);
+        try {
+            $request->validate([
+                'name' => 'required',
+                'email' => 'required|email|unique:users',
+                'password' => 'required|min:6',
+            ]);
 
-        $user = new User;
-        $user->name = $request->name;
-        $user->email = $request->email;
-        $user->password = Hash::make($request->password);
-        $user->save();
+            $user = new User;
+            $user->name = $request->name;
+            $user->email = $request->email;
+            $user->password = Hash::make($request->password);
+            $user->save();
 
-        return response()->json([
-            'message' => 'User created',
-        ]);
+            return response()->json([
+                'success' => true,
+                'message' => 'User created',
+            ]);
+        }catch (\Throwable $th) {
+            return response()->json([
+                'success' => false,
+                'message' => $th->getMessage(),
+            ]);
+        }
     }
 
     public function login (Request $request)
     {
-        $request->validate([
-            'email' => 'required|email',
-            'password' => 'required',
-        ]);
+        try {
+            $request->validate([
+                'email' => 'required|email',
+                'password' => 'required',
+            ]);
 
-        $user = User::where('email', $request->email)->first();
+            $user = User::where('email', $request->email)->first();
 
-        if (! $user || ! Hash::check($request->password, $user->password)) {
-            throw ValidationException::withMessages([
+            if (! $user || ! Hash::check($request->password, $user->password)) {
+                throw ValidationException::withMessages([
+                    "success" => false,
+                    'error' =>  "Invalid username or password"
+                ]);
+            }
+            return response()->json([
+                "success" => true,
+                'token' => $user->createToken($user->id)->plainTextToken,
+                "user" => $user,
+            ]);
+        }catch (\Throwable $th) {
+            return response()->json([
                 "success" => false,
-                'error' =>  "Invalid username or password"
+                'message'   => $th->getMessage(),
             ]);
         }
-        return response()->json([
-            "success" => true,
-            'token' => $user->createToken($user->id)->plainTextToken,
-            "user" => $user,
-        ]);
     }
 
     public function logout (Request $request)
@@ -82,6 +97,7 @@ class AuthController extends Controller
         return response()->json([
             "success" => $personal_access ? true : false,
             'message' => $personal_access ? "Authenticated" : "Unauthenticated",
+            'token' => $token,
             "user" => $personal_access ? User::find($personal_access->tokenable_id) : null,
         ]);
     }

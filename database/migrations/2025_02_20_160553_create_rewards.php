@@ -19,6 +19,7 @@ class CreateRewards extends Migration
             $table->string('description')->nullable();
             $table->integer('points');
             $table->string('image')->nullable();
+            $table->date('start_date')->nullable();
             $table->date('expiry_date')->nullable();
             $table->boolean('is_active')->default(true);
             $table->timestamps();
