@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Models\UserPointTransaction;
 use App\Models\UserReward;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\PersonalAccessToken;
 
 class RewardController extends Controller
@@ -76,39 +77,54 @@ class RewardController extends Controller
                 'message' => 'Reward not found',
             ]);
         }
+        DB::beginTransaction();
+        try {
+            $user = $request->user();
+            $user_id = $user->id;
 
-        $user = $request->user();
-        $user_id = $user->id;
+            $user_reward = UserReward::where('user_id', $user_id)->where('reward_id', $reward->id)->first();
+            if ($user_reward) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Reward already redeemed',
+                ]);
+            }
 
-        $user_reward = UserReward::where('user_id', $user_id)->where('reward_id', $reward->id)->first();
-        if ($user_reward) {
+            $userReward = new UserReward();
+            $userReward->user_id = $user_id;
+            $userReward->reward_id = $reward->id;
+            $userReward->status = 'redeemed';
+            $userReward->redeemed_at = now();
+            $userReward->save();
+
+            //transaction
+            $transaction = new UserPointTransaction();
+            $transaction->user_id = $user_id;
+            $transaction->reward_id = $reward->id;
+            $transaction->points_change = $reward->points * -1;
+            $transaction->description = 'Redeem reward: ' . $reward->name;
+            $transaction->transaction_type = 'redeem';
+            $transaction->transaction_date = now();
+            $transaction->save();
+
+            $user->point -= $reward->points;
+            $user->save();
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Reward redeemed',
+                'user' => $user,
+                'user_reward' => $userReward->load('reward')
+            ]);
+        }catch (\Exception $e){
+            DB::rollback();
             return response()->json([
                 'success' => false,
-                'message' => 'Reward already redeemed',
+                'message' => $e->getMessage(),
             ]);
         }
-
-        $userReward = new UserReward();
-        $userReward->user_id = $user_id;
-        $userReward->reward_id = $reward->id;
-        $userReward->status = 'redeemed';
-        $userReward->redeemed_at = now();
-        $userReward->save();
-
-        //transaction
-        $transaction = new UserPointTransaction();
-        $transaction->user_id = $user_id;
-        $transaction->points = $reward->points * -1;
-        $transaction->description = 'Redeem reward: ' . $reward->name;
-        $transaction->transaction_type = 'redeem';
-        $transaction->transaction_date = now();
-        $transaction->save();
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Reward redeemed',
-            'user_reward' => $userReward->load('reward')
-        ]);
     }
 
     public function redeemStatus ($reward_id,Request $request)
@@ -152,7 +168,7 @@ class RewardController extends Controller
         try {
             return response()->json([
                 "success" => true,
-                'total_points' => $request->user()->points,
+                'total_points' => $request->user()->point,
             ]);
         } catch (\Throwable $th) {
             return response()->json([
@@ -160,5 +176,17 @@ class RewardController extends Controller
                 'error' => "Unauthorized"
             ]);
         }
+    }
+
+    public function redeemHistory (Request $request)
+    {
+        $user = $request->user();
+        $user_id = $user->id;
+        $user_rewards = UserReward::where('user_id', $user_id)->with('reward')->get();
+
+        return response()->json([
+            'success' => true,
+            'user_rewards' => $user_rewards,
+        ]);
     }
 }

@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class AuthController extends Controller
 {
@@ -72,5 +73,19 @@ class AuthController extends Controller
             ]);
         }
     }
+
+    public function checkAuth (Request $request)
+    {
+        $token = $request->bearerToken();
+        $personal_access = $token ? PersonalAccessToken::findToken($token) : null;
+
+        return response()->json([
+            "success" => $personal_access ? true : false,
+            'message' => $personal_access ? "Authenticated" : "Unauthenticated",
+            "user" => $personal_access ? User::find($personal_access->tokenable_id) : null,
+        ]);
+    }
+
+
 
 }

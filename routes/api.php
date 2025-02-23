@@ -21,6 +21,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::group(['prefix' => 'auth'], function () {
         Route::get('/profile', [AuthController::class, 'getProfile']);
         Route::post('/logout', [AuthController::class, 'logout']);
+
     });
 
     Route::group(['prefix' => 'rewards'], function () {
@@ -28,10 +29,13 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/redeem/{reward_id}/status', [RewardController::class, 'redeemStatus']);
     });
     Route::get('total-points', [RewardController::class, 'totalPoints']);
+
+    Route::get('redeem-history', [RewardController::class, 'redeemHistory']);
 });
 
 Route::middleware('api')->group(function () {
     Route::post('/auth/login', [AuthController::class, 'login']);
+    Route::get('/auth/check-auth', [AuthController::class, 'checkAuth']);
 
     Route::post('/register', [AuthController::class, 'register']);
 
